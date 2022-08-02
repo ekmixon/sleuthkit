@@ -37,19 +37,19 @@ def getDependencies(depBranch):
     passed = True
 
     # get all nuget packages needed by the solution
-    if(passed):
-        TSK_HOME = os.getenv("TSK_HOME", False)
-        if not TSK_HOME:
-            print("Please set the TSK_HOME environment variable")
-            sys.exit(1)
-        else:
+    if passed:
+        if TSK_HOME := os.getenv("TSK_HOME", False):
             # nuget restore 
             os.chdir(os.path.join(os.getenv("TSK_HOME"),"win32"))
-            
+
             print ("Restoring nuget packages.")
             ret = subprocess.call(["nuget", "restore", "tsk-win.sln"] , stdout=sys.stdout)
             if ret != 0:
                 sys.exit("Failed to restore nuget packages")
+
+        else:
+            print("Please set the TSK_HOME environment variable")
+            sys.exit(1)
                  
 
 def buildTSKAll():
@@ -73,20 +73,16 @@ def buildTSK(wPlatform, target):
     '''
     global passed
 
-    print ("Building TSK " + str(wPlatform) + "-bit " + target + " build.")
+    print(f"Building TSK {str(wPlatform)}-bit {target} build.")
     sys.stdout.flush()
-    TSK_HOME = os.getenv("TSK_HOME",False)
+    if TSK_HOME := os.getenv("TSK_HOME", False):
+        os.chdir(os.path.join(os.getenv("TSK_HOME"),"win32"))
 
-    if not TSK_HOME:
+    else:
         print("Please set the TSK_HOME environment variable")
         sys.exit(1)
-    else:
-        os.chdir(os.path.join(os.getenv("TSK_HOME"),"win32"))
-                 
-    vs = []
-    vs.append(MSBUILD_PATH)
-    vs.append(os.path.join("tsk-win.sln"))
-    vs.append("/p:configuration=" + target)
+    vs = [MSBUILD_PATH, os.path.join("tsk-win.sln")]
+    vs.append(f"/p:configuration={target}")
     if wPlatform == 64:
         vs.append("/p:platform=x64")
     elif wPlatform == 32:
@@ -96,19 +92,14 @@ def buildTSK(wPlatform, target):
         sys.stdout.flush()
         passed = False
         return
-    vs.append("/clp:ErrorsOnly")
-    vs.append("/t:clean")
-    vs.append("/t:build")
-    vs.append("/m")
-
+    vs.extend(("/clp:ErrorsOnly", "/t:clean", "/t:build", "/m"))
     outputFile = os.path.join(LOG_PATH, "TSKOutput.txt")
-    VSout = open(outputFile, 'w')
-    ret = subprocess.call(vs, stdout=sys.stdout)
-    VSout.close()
+    with open(outputFile, 'w') as VSout:
+        ret = subprocess.call(vs, stdout=sys.stdout)
     if ret != 0:
-        print("ret = " + str(ret))
+        print(f"ret = {str(ret)}")
         print(vs)
-        print("LIBTSK " + str(wPlatform) + "-bit C++ failed to build.\n")
+        print(f"LIBTSK {str(wPlatform)}" + "-bit C++ failed to build.\n")
         sys.stdout.flush()
         passed = False
         return
@@ -156,7 +147,7 @@ class OS:
   LINUX, MAC, WIN, CYGWIN = range(4)
 if __name__ == "__main__":
     global SYS
-    if _platform == "linux" or _platform == "linux2":
+    if _platform in ["linux", "linux2"]:
         SYS = OS.LINUX
     elif _platform == "darwin":
         SYS = OS.MAC
